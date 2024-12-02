@@ -67,15 +67,30 @@ Estimate poses and save them in one .csv file per dataset ([format description](
 
 In [bop_toolkit_lib/config.py](https://github.com/thodan/bop_toolkit/blob/master/bop_toolkit_lib/config.py), set paths to the BOP datasets, to a folder with results to be evaluated, and to a folder for the evaluation output. The other parameters are necessary only if you want to visualize results or run the C++ Renderer.
 
-### 4. Evaluate the pose estimates
+### 4. Evaluate the pose estimates for 6D detection task
 ```
-python scripts/eval_bop19.py --renderer_type=vispy --result_filenames=NAME_OF_CSV_WITH_RESULTS
+python scripts/eval_bop24_pose.py --result_filenames=NAME_OF_CSV_WITH_RESULTS --use_gpu
+```
+`--use_gpu`: Use GPU for the evaluation which requires [PyTorch]() installed and a GPU with CUDA support. The current implementation limits GPU memory usage to less than 2GB for BOP servers. If you have GPUs with larger memory, you can increase the limit by setting the [max_batch_size](https://github.com/thodan/bop_toolkit/blob/master/bop_toolkit_lib/pose_error_gpu.py#L9) parameter. If GPU is not used, the evaluation is performed on CPU with 10 parallel processes. You can change the number of processes by setting the `--num_worker 1`.
+
+`--result_filenames`: Comma-separated filenames with pose estimates in .csv ([examples](https://bop.felk.cvut.cz/media/data/bop_sample_results/bop_challenge_2019_sample_results.zip)).
+
+#### HOT3D special case
+The [Hand Tracking Toolkit](https://github.com/facebookresearch/hand_tracking_toolkit) Fisheye camera implementation is necessary for evaluation on the HOT3D dataset. Install with:  
+
+`pip install git+https://github.com/facebookresearch/hand_tracking_toolkit`
+
+### 5. Evaluate the pose estimates for 6D localization task
+```
+python scripts/eval_bop19_pose.py --renderer_type=vispy --result_filenames=NAME_OF_CSV_WITH_RESULTS
 ```
 `--renderer_type`: "vispy", "python", or "cpp" (We recommend using "vispy" since it is easy to install and works headlessly. For "cpp", you need to install the C++ Renderer [bop_renderer](https://github.com/thodan/bop_renderer).).
 
 `--result_filenames`: Comma-separated filenames with pose estimates in .csv ([examples](https://bop.felk.cvut.cz/media/data/bop_sample_results/bop_challenge_2019_sample_results.zip)).
 
-### 5. Evaluate the detections / instance segmentations
+By default, this script is run with 10 parallel processes. You can change the number of processes by setting the `--num_worker 1`.
+
+### 6. Evaluate the detections / instance segmentations
 ```
 python scripts/eval_bop22_coco.py --result_filenames=NAME_OF_JSON_WITH_COCO_RESULTS --ann_type='bbox'
 ```
