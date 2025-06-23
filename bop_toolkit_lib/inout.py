@@ -7,55 +7,56 @@ import os
 import gzip
 import struct
 import numpy as np
-import imageio
+import numpy.typing as npt
+import imageio.v2 as iio
 import png
 import json
 from collections import defaultdict
+from pathlib import Path
+from typing import Union, List
 
 from bop_toolkit_lib import misc
 
 
-def load_im(path):
+def load_im(path: Union[str,Path]):
     """Loads an image from a file.
 
     :param path: Path to the image file to load.
     :return: ndarray with the loaded image.
     """
-    im = imageio.imread(path)
+    im = iio.imread(path)
     return im
 
 
-def save_im(path, im, jpg_quality=95):
+def save_im(path: Union[str,Path], im: npt.NDArray, jpg_quality: int =95):
     """Saves an image to a file.
 
     :param path: Path to the output image file.
     :param im: ndarray with the image to save.
     :param jpg_quality: Quality of the saved image (applies only to JPEG).
     """
-    ext = os.path.splitext(path)[1][1:]
-    if ext.lower() in ["jpg", "jpeg"]:
-        imageio.imwrite(path, im, quality=jpg_quality)
+    if Path(path).suffix.lower() in ["jpg", "jpeg"]:
+        iio.imwrite(path, im, quality=jpg_quality)
     else:
-        imageio.imwrite(path, im, compression=3)
+        iio.imwrite(path, im, compression=3)
 
 
-def load_depth(path):
+def load_depth(path: Union[str,Path]):
     """Loads a depth image from a file.
 
     :param path: Path to the depth image file to load.
     :return: ndarray with the loaded depth image.
     """
-    d = imageio.imread(path)
-    return d.astype(np.float32)
+    return iio.imread(path).astype(np.float32)
 
 
-def save_depth(path, im):
+def save_depth(path: Union[str,Path], im: npt.NDArray):
     """Saves a depth image (16-bit) to a PNG file.
 
     :param path: Path to the output depth image file.
     :param im: ndarray with the depth image to save.
     """
-    if path.split(".")[-1].lower() != "png":
+    if Path(path).suffix.lower() != ".png":
         raise ValueError("Only PNG format is currently supported.")
 
     im_uint16 = np.round(im).astype(np.uint16)
@@ -66,19 +67,21 @@ def save_depth(path, im):
         w_depth.write(f, np.reshape(im_uint16, (-1, im.shape[1])))
 
 
-def load_json(path, keys_to_int=False):
+def load_json(path: Union[str,Path], keys_to_int=False):
     """Loads content of a JSON file.
 
     :param path: Path to the JSON file. If ".json.gz" extension, opens with gzip.
     :return: Content of the loaded JSON file.
     """
+    path = Path(path)
+    assert path.as_posix().endswith(('.json', '.json.gz')), f"{path} should end with .json or .json.gz extension"
 
     # Keys to integers.
     def convert_keys_to_int(x):
         return {int(k) if k.lstrip("-").isdigit() else k: v for k, v in x.items()}
     
     # Open+decompress with gzip if ".json.gz" file extension
-    if path.endswith('.json.gz'):
+    if path.as_posix().endswith('.json.gz'):
         f = gzip.open(path, "rt", encoding="utf8")
     else:
         f = open(path, "r")
@@ -92,15 +95,19 @@ def load_json(path, keys_to_int=False):
     return content
 
 
-def save_json(path, content, compress=False):
+def save_json(path: Union[str,Path], content: dict, compress=False, verbose=False):
     """Saves the provided content to a JSON file.
 
     :param path: Path to the output JSON file.
     :param content: Dictionary/list to save.
     :param compress: Saves as a gzip archive, appends ".gz" extension to filepath.
     """
+    path = Path(path)
+    assert path.as_posix().endswith(('.json', '.json.gz')), f"{path} should end with .json or .json.gz extension"
+    
     if compress:
-        path += ".gz"
+        if path.suffix == '.json':
+            path = path.parent / (path.stem + ".json.gz")
         f = gzip.open(path, "wt", encoding="utf8")
     else:
         f = open(path, "w")
@@ -128,9 +135,11 @@ def save_json(path, content, compress=False):
         json.dump(content, f, sort_keys=True)
 
     f.close()
+    if verbose:
+        misc.log(f"Saved {path}")
 
 
-def load_cam_params(path):
+def load_cam_params(path: Union[str,Path]):
     """Loads camera parameters from a JSON file.
 
     :param path: Path to the JSON file.
@@ -154,7 +163,7 @@ def load_cam_params(path):
     return cam
 
 
-def _camera_as_numpy(camera):
+def _camera_as_numpy(camera: dict):
     """Convert fields from scene camera from native python to numpy.
 
     See docs/bop_datasets_format.md for details.
@@ -180,7 +189,7 @@ def _camera_as_numpy(camera):
     return camera
 
 
-def _camera_as_json(camera):
+def _camera_as_json(camera: dict):
     """Convert fields from scene camera from numpy to native python.
 
     See docs/bop_datasets_format.md for details.
@@ -206,7 +215,7 @@ def _camera_as_json(camera):
     return camera
 
 
-def load_scene_camera(path):
+def load_scene_camera(path: Union[str,Path]):
     """Loads content of a JSON file with information about the scene camera.
 
     See docs/bop_datasets_format.md for details.
@@ -221,7 +230,7 @@ def load_scene_camera(path):
     return scene_camera
 
 
-def save_scene_camera(path, scene_camera):
+def save_scene_camera(path: Union[str,Path], scene_camera: dict):
     """Saves information about the scene camera to a JSON file.
 
     See docs/bop_datasets_format.md for details.
@@ -234,7 +243,7 @@ def save_scene_camera(path, scene_camera):
     save_json(path, scene_camera)
 
 
-def _gt_as_numpy(gt):
+def _gt_as_numpy(gt: dict):
     if "cam_R_m2c" in gt.keys():
         gt["cam_R_m2c"] = np.array(gt["cam_R_m2c"], np.float64).reshape((3, 3))
     if "cam_t_m2c" in gt.keys():
@@ -242,7 +251,7 @@ def _gt_as_numpy(gt):
     return gt
 
 
-def _gt_as_json(gt):
+def _gt_as_json(gt: dict):
     if "cam_R_m2c" in gt.keys():
         gt["cam_R_m2c"] = gt["cam_R_m2c"].flatten().tolist()
     if "cam_t_m2c" in gt.keys():
@@ -252,7 +261,7 @@ def _gt_as_json(gt):
     return gt
 
 
-def load_scene_gt(path):
+def load_scene_gt(path: Union[str,Path]):
     """Loads content of a JSON file with ground-truth annotations.
 
     See docs/bop_datasets_format.md for details.
@@ -271,7 +280,7 @@ def load_scene_gt(path):
     return scene_gt
 
 
-def save_scene_gt(path, scene_gt):
+def save_scene_gt(path: Union[str,Path], scene_gt: dict):
     """Saves ground-truth annotations to a JSON file.
 
     See docs/bop_datasets_format.md for details.
@@ -291,7 +300,7 @@ def save_scene_gt(path, scene_gt):
     save_json(path, scene_gt)
 
 
-def load_bop_results(path, version="bop19", max_num_estimates_per_image=None):
+def load_bop_results(path: Union[str,Path], version="bop19", max_num_estimates_per_image=None):
     """Loads 6D object pose estimates from a file.
 
     :param path: Path to a file with pose estimates.
@@ -357,7 +366,7 @@ def load_bop_results(path, version="bop19", max_num_estimates_per_image=None):
     return results
 
 
-def save_bop_results(path, results, version="bop19"):
+def save_bop_results(path: Union[str,Path], results: List[dict], version="bop19"):
     """Saves 6D object pose estimates to a file.
 
     :param path: Path to the output file.
@@ -392,46 +401,61 @@ def save_bop_results(path, results, version="bop19"):
         raise ValueError("Unknown version of BOP results.")
 
 
-def check_bop_results(path, version="bop19"):
+def check_consistent_timings(results, im_id_key):
+    """
+    Check if the time for all estimates from the same image are the same.
+
+    :param results: list of pose or coco results
+    :param im_id_key: "im_id" for pose results, "image_id" for coco results
+    "return: tuple (check_passed, check_msg, times, times_available)
+    """
+    times = {}
+    times_available = True
+    for result in results:
+        scene_id, im_id = result["scene_id"], result[im_id_key]
+        result_key = f"{scene_id:06d}_{im_id:06d}"
+        if result["time"] < 0:
+            # negative times are interpreted as not available times
+            times_available = False
+        if result_key in times:
+            if abs(times[result_key] - result["time"]) > 0.001:
+                check_msg = f"The running time for scene {scene_id} and image {im_id} is not the same for all estimates."
+                misc.log(check_msg)
+                return False, check_msg, times, times_available
+        else:
+            times[result_key] = result["time"]
+
+    # all results passed the test
+    return True, "OK", times, times_available
+
+
+def check_bop_results(path: Union[str,Path], version="bop19"):
     """Checks if the format of BOP results is correct.
 
-    :param result_filenames: Path to a file with pose estimates.
+    :param path: Path to a file with pose estimates.
     :param version: Version of the results.
     :return: True if the format is correct, False if it is not correct.
     """
-    check_passed = True
-    check_msg = "OK"
     try:
         results = load_bop_results(path, version)
 
+        if len(results) == 0:
+            return False, "Empty results"
+
         if version == "bop19":
-            # Check if the time for all estimates from the same image are the same.
-            times = {}
-            for result in results:
-                result_key = "{:06d}_{:06d}".format(result["scene_id"], result["im_id"])
-                if result_key in times:
-                    if abs(times[result_key] - result["time"]) > 0.001:
-                        check_passed = False
-                        check_msg = (
-                            "The running time for scene {} and image {} is not the same for"
-                            " all estimates.".format(
-                                result["scene_id"], result["im_id"]
-                            )
-                        )
-                        misc.log(check_msg)
-                        break
-                else:
-                    times[result_key] = result["time"]
+            check_timings, check_msg_timings, times, times_available = check_consistent_timings(results, "im_id")
+            if not check_timings:
+                return False, check_msg_timings
 
     except Exception as e:
-        check_passed = False
-        check_msg = "Error when loading BOP results: {}".format(e)
+        check_msg = f"Error when loading BOP results: {e}"
         misc.log(check_msg)
+        return False, check_msg
 
-    return check_passed, check_msg
+    return True, "OK"
 
 
-def check_coco_results(path, version="bop22", ann_type="segm", enforce_no_segm_if_bbox=False):
+def check_coco_results(path: Union[str,Path], version="bop22", ann_type="segm", enforce_no_segm_if_bbox=False):
     """Checks if the format of extended COCO results is correct.
 
     :param path: Path to a file with coco estimates. If ".json.gz" extension, opens with gzip.
@@ -443,16 +467,15 @@ def check_coco_results(path, version="bop22", ann_type="segm", enforce_no_segm_i
     :return: True if the format is correct, False if it is not correct.
     """
 
-    misc.log("Checking coco result format...")
-    check_passed = True
-    check_msg = "OK"
     try:
         results = load_json(path, keys_to_int=True)
     except Exception as e:
-        check_passed = False
-        check_msg = "Error when loading COCO results: {}".format(e)
+        check_msg = f"Error when loading BOP coco results: {e}"
         misc.log(check_msg)
-        raise
+        return False, check_msg
+    
+    if len(results) == 0:
+        return False, "Empty results"
 
     if version == "bop22":
         try:
@@ -478,14 +501,20 @@ def check_coco_results(path, version="bop22", ann_type="segm", enforce_no_segm_i
                     assert "size" in result["segmentation"], "Incorrect RLE format!"
                 if "time" in result:
                     assert isinstance(result["time"], (float, int))
-        except AssertionError as msg:
-            check_msg = "Error when checking keys and types: {}".format(msg)
-            check_passed = False
+
+        except (AssertionError, Exception) as e:
+            check_msg = f"Error when checking keys and types: {e}"
             misc.log(check_msg)
-    return check_passed, check_msg
+            return False, check_msg
+
+        check_timings, check_msg_timings, times, times_available = check_consistent_timings(results, "image_id")
+        if not check_timings:
+            return False, check_msg_timings
+
+    return True, "OK"
 
 
-def save_coco_results(path, results, version="bop22", compress=False):
+def save_coco_results(path: Union[str,Path], results: List[dict], version="bop22", compress=False):
     """Saves detections/instance segmentations for each scene in coco format.
 
     "bbox" should be [x,y,w,h] in pixels
@@ -517,7 +546,7 @@ def save_coco_results(path, results, version="bop22", compress=False):
         raise ValueError("Unknown version of BOP detection results.")
 
 
-def load_ply(path):
+def load_ply(path: Union[str,Path]):
     """Loads a 3D mesh model from a PLY file.
 
     :param path: Path to a PLY file.
@@ -621,6 +650,7 @@ def load_ply(path):
         "float": ("f", 4),
         "double": ("d", 8),
         "int": ("i", 4),
+        "uint": ("I", 4),
         "uchar": ("B", 1),
     }
 
@@ -713,7 +743,7 @@ def load_ply(path):
     return model
 
 
-def save_ply(path, model, extra_header_comments=None):
+def save_ply(path: Union[str,Path], model: dict, extra_header_comments=None):
     """Saves a 3D mesh model to a PLY file.
 
     :param path: Path to a PLY file.
@@ -856,8 +886,20 @@ def save_ply2(
     f.close()
 
 
-def get_im_targets(im_gt, im_gt_info, visib_gt_min, eval_mode="localization"):
+def get_im_targets(im_gt: dict, im_gt_info: dict, visib_gt_min: float, eval_mode="localization"):
+    """
+    From an image gt and gt info, given a minimum visibility, get valid object evaluation targets.
+
+    Output format: dict[obj_id]
+    {
+        <obj_id1>: {'inst_count': <inst_count_1>},
+        <obj_id2>: {'inst_count': <inst_count_2>},
+        ...
+    }
+    """
     im_targets = {}
+    # Objects gt detection are have gt and gt_info have same order.
+    # object id is retrieved from gt and visibility from gt info.
     for gt_id, gt in enumerate(im_gt):
         gt_info = im_gt_info[gt_id]
         obj_id = gt["obj_id"]
@@ -871,3 +913,128 @@ def get_im_targets(im_gt, im_gt_info, visib_gt_min, eval_mode="localization"):
             im_targets[obj_id] = {"inst_count": 0}
         im_targets[obj_id]["inst_count"] += 1
     return im_targets
+
+
+def parse_result_filename(result_filename: Union[str,Path]):
+    """
+    Parse result filename to get method, dataset, split and split_type.
+
+    Result file needs to follow one of the valid BOP result file format:
+    - "{method}_{dataset}-{split}.{ext}"
+    - "{method}_{dataset}-{split}_{optional_id}.{ext}"
+    - "{method}_{dataset}-{split}-{split_type}.{ext}"
+    - "{method}_{dataset}-{split}_{optional_id}.{ext}"
+
+    where the individual elements :
+    - method: name of the method used to produced the results
+    - dataset: name of the dataset on which the results was produced (e.g. "ycbv", "tless", etc.)
+    - split: name of the dataset split on which the results was produced (e.g. "test", "val", etc.)
+    - split_type: name of the dataset split on which the results was produced (e.g. "test", "val", etc.)
+    - optional_id: id that may be attached to uniquely identify result file
+    - ext: file extension (e.g. "csv", "json", "json.gz")
+
+    :param result_filename: name or full path of a result file.
+    :return: tuple (result_name, method, dataset, split, split_type, ext)
+    """
+    try:
+        # Split the filename
+        filename_split = os.path.basename(result_filename).split('.')
+        result_name = filename_split[0]
+        ext = '.'.join(filename_split[1:])
+        result_info = result_name.split("_")
+        method = result_info[0]
+        dataset_info = result_info[1].split("-")
+        dataset = dataset_info[0]
+        split = dataset_info[1]
+        split_type = str(dataset_info[2]) if len(dataset_info) > 2 else None
+
+        return result_name, method, dataset, split, split_type, ext
+    
+    except ValueError as e:
+        FILENAME_FORMATS = [
+            "{method}_{dataset}-{split}.{ext}",
+            "{method}_{dataset}-{split}_{optional_id}.{ext}",
+            "{method}_{dataset}-{split}-{split_type}.{ext}",
+            "{method}_{dataset}-{split}_{optional_id}.{ext}",
+        ]
+        formats_str = '\n'.join(FILENAME_FORMATS)
+        error_msg = (
+            f"Wrong format for result file name {result_filename}\n" +
+            f"Should follow one of those formats: \n{formats_str}"
+        )
+        raise ValueError(error_msg)
+
+
+def _create_result_filename(method: str, dataset: str, split: str, ext: str, split_type: Union[str,None], optional_id: Union[str,None]):
+    """Create a result filename. 
+    
+    Filename will following one of the valid formats (depending on args value): 
+    - "{method}_{dataset}-{split}.{ext}"
+    - "{method}_{dataset}-{split}_{optional_id}.{ext}"
+    - "{method}_{dataset}-{split}-{split_type}.{ext}"
+    - "{method}_{dataset}-{split}_{optional_id}.{ext}"
+
+    :param: method: name of the method used to produced the results
+    :param: dataset: name of the dataset on which the results was produced (e.g. "ycbv", "tless", etc.)
+    :param: split: name of the dataset split on which the results was produced (e.g. "test", "val", etc.)
+    :param: ext: file extension (e.g. "csv", "json", "json.gz")
+    :param: split_type: name of the dataset split on which the results was produced (e.g. "test", "val", etc.). Optional.
+    :param: optional_id: id that may be attached to uniquely identify result file. Optional.
+    """
+
+    if split_type is None and optional_id is None:
+        return f"{method}_{dataset}-{split}.{ext}"
+    elif split_type is None:
+        return f"{method}_{dataset}-{split}_{optional_id}.{ext}"
+    elif optional_id is None:
+        return f"{method}_{dataset}-{split}-{split_type}.{ext}"
+    else:
+        return f"{method}_{dataset}-{split}-{split_type}_{optional_id}.{ext}"
+
+
+def create_coco_result_filename(
+        method: str, 
+        dataset: str, 
+        split: str, 
+        split_type: Union[str,None] = None, 
+        optional_id: Union[str,None] = None
+    ):
+    """Create a coco result filename. 
+    
+    Filename will following one of the valid formats (depending on args value): 
+    - "{method}_{dataset}-{split}.json"
+    - "{method}_{dataset}-{split}_{optional_id}.json"
+    - "{method}_{dataset}-{split}-{split_type}.json"
+    - "{method}_{dataset}-{split}_{optional_id}.json"
+
+    :param: method: name of the method used to produced the results
+    :param: dataset: name of the dataset on which the results was produced (e.g. "ycbv", "tless", etc.)
+    :param: split: name of the dataset split on which the results was produced (e.g. "test", "val", etc.)
+    :param: split_type: name of the dataset split on which the results was produced (e.g. "test", "val", etc.). Optional.
+    :param: optional_id: id that may be attached to uniquely identify result file. Optional.
+    """
+    return _create_result_filename(method, dataset, split, "json", split_type, optional_id)
+
+
+def create_pose_result_filename(
+        method: str, 
+        dataset: str, 
+        split: str, 
+        split_type: Union[str,None] = None, 
+        optional_id: Union[str,None] = None
+    ):
+    """Create a pose result filename. 
+    
+    Filename will following one of the valid formats (depending on args value): 
+    - "{method}_{dataset}-{split}.csv"
+    - "{method}_{dataset}-{split}_{optional_id}.csv"
+    - "{method}_{dataset}-{split}-{split_type}.csv"
+    - "{method}_{dataset}-{split}_{optional_id}.csv"
+
+    :param: method: name of the method used to produced the results
+    :param: dataset: name of the dataset on which the results was produced (e.g. "ycbv", "tless", etc.)
+    :param: split: name of the dataset split on which the results was produced (e.g. "test", "val", etc.)
+    :param: split_type: name of the dataset split on which the results was produced (e.g. "test", "val", etc.). Optional.
+    :param: optional_id: id that may be attached to uniquely identify result file. Optional.
+    """
+    return _create_result_filename(method, dataset, split, "csv", split_type, optional_id)

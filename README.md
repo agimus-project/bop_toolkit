@@ -12,15 +12,30 @@ A Python toolkit of the BOP benchmark for 6D object pose estimation
   visualization of 6D object poses etc.
 
 ## Installation
+Supported python versions: [3.8-3.12]
 
-### Python Dependencies
+### Using [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
-To install the required python libraries, run:
+```bash
+uv sync
 ```
-pip install -r requirements.txt -e .
-```
+This commands sets up a local venv (activate with `source .venv/bin/activate`), installs necessary dependencies and bop_toolkit_lib. You may provide additional flags such as:
 
-In the case of problems, try to first run: ```pip install --upgrade pip setuptools```
+- `--python 3.10`: specify the venv python version
+- `--extra eval_coco`: install dependencies for coco evaluation
+- `--extra eval_gpu`: install dependencies for gpu evaluation
+- `--extra eval_hot3d`: install dependencies for hot3d evaluation
+- `--extra scripts`: install dependencies for utility scripts (e.g. `annotation_tools.py`)
+
+### Using pip
+```bash
+pip install .  # bop_toolkit_lib with core dependencies only
+# with additional dependencies
+pip install .[eval_coco]  # install dependencies for coco evaluation
+pip install .[eval_gpu]  # install dependencies for gpu evaluation
+pip install .[eval_hot3d]  # install dependencies for hot3d evaluation
+uv pip install .[scripts]  # install dependencies for utility scripts (e.g. `annotation_tools.py`)
+```
 
 ### Vispy Renderer (default)
 
@@ -107,31 +122,5 @@ Set the dataset and split parameters in the top section of the script.
 
 ## Manual annotation tool
 
-To annotate a new dataset in BOP format use [this tool](./scripts/annotation_tool.py).
+To annotate a new dataset or change an existing dataset in the BOP format please refer to the annotation tool [README](scripts/annotation_tool/README.md).
 
-First install Open3d dependency
-
-```
-pip install open3d==0.15.2
-```
-
-Edit the file paths in parameters section at the beginning of the file then run:
-
-```
-python scripts/annotation_tool.py
-```
-
-### Interface:
-
-Control the object pose with the following keys
-`i`: up, `,`: down, `j`: front, `k`:back, `h`:left, `l`:right
-
-Translation/rotation mode:
-- Shift not clicked: translation mode
-- Shift clicked: rotation model
-
-Distance/angle big or small:
-- Ctrl not clicked: small distance(1mm) / angle(2deg)
-- Ctrl clicked: big distance(5cm) / angle(90deg)
-
-R or "Refine" button will call ICP algorithm to do local refinement of the annotation

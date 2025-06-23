@@ -160,19 +160,16 @@ for result_filename in p["result_filenames"]:
     time_start = time.time()
 
     # Parse info about the method and the dataset from the filename.
-    result_name = os.path.splitext(os.path.basename(result_filename))[0]
-    result_info = result_name.split("_")
-    method = str(result_info[0])
-    dataset_info = result_info[1].split("-")
-    dataset = str(dataset_info[0])
-    split = str(dataset_info[1])
-    split_type = str(dataset_info[2]) if len(dataset_info) > 2 else None
+    result_name, method, dataset, split, split_type, _ = inout.parse_result_filename(result_filename)
     split_type_str = " - " + split_type if split_type is not None else ""
 
     # Load dataset parameters.
     dp_split = dataset_params.get_split_params(
         p["datasets_path"], dataset, split, split_type
     )
+
+    if dataset == "xyzibd":
+        p["max_num_estimates_per_image"] = 200
 
     if p["error_type"] not in dp_split["supported_error_types"]:
         raise ValueError("""{} error is not among {} """
@@ -246,7 +243,8 @@ for result_filename in p["result_filenames"]:
 
     # Load pose estimates.
     logger.info("Loading pose estimates...")
-    ests = inout.load_bop_results(os.path.join(p["results_path"], result_filename), max_num_estimates_per_image=p["max_num_estimates_per_image"] if p["eval_mode"] == "detection" else None)
+    max_num_estimates_per_image = p["max_num_estimates_per_image"] if p["eval_mode"] == "detection" else None
+    ests = inout.load_bop_results(os.path.join(p["results_path"], result_filename), max_num_estimates_per_image=max_num_estimates_per_image)
 
     # Organize the pose estimates by scene, image and object.
     logger.info("Organizing pose estimates...")
@@ -258,7 +256,7 @@ for result_filename in p["result_filenames"]:
 
     for scene_id, scene_targets in targets_org.items():
         logger.info("Processing scene {} of {}...".format(scene_id, dataset))
-        tpath_keys = dataset_params.scene_tpaths_keys(dp_split["eval_modality"], scene_id)
+        tpath_keys = dataset_params.scene_tpaths_keys(dp_split["eval_modality"], dp_split["eval_sensor"], scene_id)
 
         # Load GT poses for the current scene.
         scene_gt = inout.load_scene_gt(
